@@ -498,7 +498,10 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     79, 0, 0, 76, 72, 0, 76, 0, 79, 0, 84, 0, 79, 0, 76, 0,   74, 0, 79, 0, 74, 0, 71, 0, 74, 0, 79, 0, 83, 0, 86, 0,
   ];
   const BASS = [45, 41, 48, 43];
-  let music = true, audio = null, out = null, hiss = null, sounding = false, beat = 0, due = 0;
+  // Two short pieces of our own for the turns of a game (Dimitris, 24 Nov 2026), as [piano key, seconds] one after another.
+  const FAIL = [[67, 0.18], [66, 0.18], [65, 0.18], [64, 0.55]];                                 // caught: four steps down
+  const CHEER = [[72, 0.1], [76, 0.1], [79, 0.1], [84, 0.1], [79, 0.1], [84, 0.6]];             // every pearl gone: up the chord and home
+  let music = true, audio = null, out = null, fx = null, hiss = null, sounding = false, beat = 0, due = 0, heard = "";
   try { music = localStorage.getItem(MUSIC) !== "0"; } catch { /* a private window: music on, as at first */ }
   /** Called from a click or a key: a browser lets a page make sound only once its visitor has touched it. */
   function wake() {
@@ -506,7 +509,8 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     try {
       if (!audio) {
         audio = new (window.AudioContext || window.webkitAudioContext)();
-        out = audio.createGain(); out.gain.value = 0; out.connect(audio.destination);
+        out = audio.createGain(); out.gain.value = 0; out.connect(audio.destination);          // the tune, which falls silent now and then
+        fx = audio.createGain(); fx.gain.value = 0.5; fx.connect(audio.destination);            // the short pieces, which play through that silence
         hiss = audio.createBuffer(1, Math.round(audio.sampleRate * 0.05), audio.sampleRate);     // a breath of noise, for the off-beats
         const d = hiss.getChannelData(0);
         for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
@@ -514,10 +518,17 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
       if (audio.state === "suspended") audio.resume();
     } catch { audio = null; }                                        // no sound on this device: the game plays on in silence
   }
-  function note(source, at, length, loud) {
+  function note(source, at, length, loud, to = out) {
     const g = audio.createGain();
     g.gain.setValueAtTime(loud, at); g.gain.exponentialRampToValueAtTime(0.001, at + length);
-    source.connect(g); g.connect(out); source.start(at); source.stop(at + length + 0.02);
+    source.connect(g); g.connect(to); source.start(at); source.stop(at + length + 0.02);
+  }
+  function jingle(notes, type, loud) {
+    let at = audio.currentTime + 0.03;
+    for (const [key, length] of notes) {
+      note(voice(type, key), at, length * 0.95, loud, fx); note(voice("triangle", key - 12), at, length * 0.95, 0.2, fx);
+      at += length;
+    }
   }
   function voice(type, key) {
     const o = audio.createOscillator();
@@ -527,7 +538,13 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
   /** Every frame: while a game runs, write down the notes of the next quarter of a second; otherwise fall silent. */
   function tune() {
     if (!audio) return;
-    const on = music && stage === "play" && !paused, now = audio.currentTime;
+    const phase = game ? game.phase : "", now = audio.currentTime;
+    if (phase !== heard) {                                           // a turn of the game: its short piece, and the tune starts afresh after it
+      if (music && stage !== "intro" && phase === "caught") { jingle(FAIL, "sawtooth", 0.1); beat = 0; }
+      if (music && stage !== "intro" && phase === "clear") { jingle(CHEER, "square", 0.12); beat = 0; }
+      heard = phase;
+    }
+    const on = music && stage === "play" && !paused && (phase === "play" || phase === "ready");
     if (on !== sounding) { sounding = on; out.gain.setTargetAtTime(on ? 0.5 : 0, now, 0.03); }
     if (!on) return;
     if (due < now) due = now + 0.05;                                 // after a silence the tune carries on from where it stopped
