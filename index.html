@@ -524,6 +524,9 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
   /** Called from a click or a key: a browser lets a page make sound only once its visitor has touched it. */
   function wake() {
     if (!music) return;
+    // On an iPhone the silent switch also silences a page's own sound, unless the page says that it is playing music
+    // (Dimitris, 24 Nov 2026: no music on the open-web address, which a desktop browser played).
+    try { if (navigator.audioSession && navigator.audioSession.type !== "playback") navigator.audioSession.type = "playback"; } catch { /* not this browser */ }
     try {
       if (!audio) {
         audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -533,7 +536,7 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
         const d = hiss.getChannelData(0);
         for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
       }
-      if (audio.state === "suspended") audio.resume();
+      if (audio.state !== "running") audio.resume();                 // "suspended" at first; on a phone also "interrupted", after a call or a locked screen
     } catch { audio = null; }                                        // no sound on this device: the game plays on in silence
   }
   function note(source, at, length, loud, to = out) {
@@ -659,6 +662,7 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     look(kymas);
     try { localStorage.setItem(LOOK, kymas ? "1" : "0"); } catch { /* as above */ }
   });
+  for (const type of ["pointerup", "keydown"]) window.addEventListener(type, wake);      // every touch may wake the sound again, should a phone have put it to sleep
   $("music").addEventListener("click", (e) => {
     sing(!music); wake();
     try { localStorage.setItem(MUSIC, music ? "1" : "0"); } catch { /* as above */ }
