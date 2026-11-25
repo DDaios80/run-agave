@@ -38,7 +38,7 @@ body {
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem }
 .name { display: flex; align-items: center; gap: 0.5rem; margin: 0 auto 0 0; font: 700 1.6rem/1 var(--display); letter-spacing: 0.01em }
 .name canvas { width: 32px; height: 38px }
-.logo { flex: none; height: 2.4rem; width: auto; padding: 0.3rem 0.55rem; border-radius: 8px; background: var(--foam) }      /* on white in both themes: a logo is drawn for a white page */
+.logo { flex: none; height: 2.75rem; width: auto; padding: 0.4rem 0.65rem; border-radius: 8px; background: var(--water); image-rendering: pixelated }      /* a white, pixelated logo: on the dark of the board in both themes */
 .hud { display: flex; align-items: center; gap: 1rem; margin: 0 }
 .hud div { display: flex; flex-direction: column; gap: 0.1rem }
 .hud dt { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
@@ -334,7 +334,6 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
   // What they wear: `y` is the sprite row the first row sits on. On a photo portrait, which is 16 rows tall with the
   // eyes near row 7, the part sits on row `face`, and may be drawn larger there (`on`).
   const FLOWER = { y: 2, colors: { p: "#fff4f8", y: GOLD }, rows: ["............p...", "...........pyp..", "............p..."] };
-  const TIE = { y: 10, face: 14, colors: { b: "#1f3a6e" }, rows: [".......bb.......", ".......bb.......", "......bbbb......"] };
   const SUNGLASSES = { y: 8, face: 6, colors: { k: INK, g: "#7fd0d6" }, rows: ["....kgkkkkgkk...", "....kkkk.kkkk..."] };
   // Instead of the captain's hat and the chef's hat, which went (Dimitris, 24 Nov 2026): glasses of red lips with the
   // tongue out, one over each eye, rock 'n' roll fashion (our own drawing, not a band's logo; they began as heart
@@ -343,8 +342,6 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     on: ["....r.r...r.r...", "...rrrrrkrrrrr..", "...rwwwr.rwwwr..", "...rtttr.rtttr..", "....tht...tht...", ".....t.....t...."] };
   const STARS = { y: 8, face: 5, colors: { p: GOLD, g: "#fff3b0", k: "#b8860b" }, rows: ["....pgppkpgpp...", "....pppp.pppp..."],
     on: [".....p.....p....", "...pppppkppppp..", "....pgp...pgp...", "....p.p...p.p...", "...p...p.p...p.."] };
-  const HEARTS = { y: 8, face: 5, colors: { p: "#e8457f", g: "#ffd1e3", k: "#a82c5c" }, rows: ["....pgppkpgpp...", "....pppp.pppp..."],
-    on: ["....p.p...p.p...", "...pgpppkpgppp..", "...ppppp.ppppp..", "....ppp...ppp...", ".....p.....p...."] };
   // m = the body, l = its light edge, s = its shade, f = the tint in the foam.
   const ROSE = { m: "#d9679a", l: "#f1a8c6", s: "#a04470", f: "#fbdfea" };
   const PALE = { m: "#dfe9f5", l: "#ffffff", s: "#9fb3d1", f: "#ffffff" };       // a Dimitris that can be caught
@@ -359,16 +356,15 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     coral: { m: "#e8705f", l: "#f6a99c", s: "#b44a3d", f: "#fde0da" }, blue: { m: "#34508f", l: "#7f9bd6", s: "#22355f", f: "#d5def3" },
     grey: { m: "#6f7f8a", l: "#b3c0c8", s: "#4a5760", f: "#e3e9ec" },
   };
+  // The tie and the heart glasses were here too; Dimitris had both removed (25 Nov 2026).
   // name: as the wardrobe offers it. as: how one person who chases four times over is told apart by name, by what each copy wears.
   const WEARS = {
     none: { name: "Nothing", parts: [], as: (who) => who },
-    tie: { name: "Tie", parts: [TIE], as: (who) => who },
     tongue: { name: "Lips and tongue", parts: [TONGUE], as: (who) => `Rock 'n' roll ${who}` },
     shades: { name: "Sunglasses", parts: [SUNGLASSES], as: (who) => `Holiday ${who}` },
     stars: { name: "Star glasses", parts: [STARS], as: (who) => `Star ${who}` },
-    hearts: { name: "Heart glasses", parts: [HEARTS], as: (who) => `${who} in love` },
   };
-  const FIRST_LOOKS = [["lavender", "tie"], ["teal", "tongue"], ["gold", "shades"], ["green", "stars"], ["coral", "none"]];      // until somebody chooses
+  const FIRST_LOOKS = [["lavender", "none"], ["teal", "tongue"], ["gold", "shades"], ["green", "stars"], ["coral", "none"]];      // until somebody chooses
   // Who plays: `person` is the one chased (people[runner]) and `worn` what they wear; `cast` the four who chase, place
   // by place: { key, name, img, palette, parts }.
   let runner = 0, person = GAME.people[0], cast = [], worn = [];
