@@ -13,15 +13,15 @@
    everything shares the width the cove gets, so the column is as wide as the window's height allows. */
 :root {
   --bg: #e4efed; --panel: #f5faf9; --fg: #12303a; --muted: #4d6971; --rule: #bfd4d2;
-  --accent: #b03a72; --on-accent: #ffffff;                       /* Agave's rose */
+  --accent: #b03a72; --on-accent: #ffffff; --logo: brightness(0.16);                       /* Agave's rose */
   --water: #12303a; --foam: #ffffff; --depth: rgba(0, 0, 0, 0.6); /* the cove keeps its colours in both themes */
   --display: "Pixelify Sans", ui-monospace, "SF Mono", Menlo, monospace;
   --body: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) { --bg: #091a20; --panel: #0f262e; --fg: #e4f0f1; --muted: #9bb6bb; --rule: #23424b; --accent: #f29bc1; --on-accent: #2b0f1d; color-scheme: dark }
+  :root:not([data-theme="light"]) { --bg: #091a20; --panel: #0f262e; --fg: #e4f0f1; --muted: #9bb6bb; --rule: #23424b; --accent: #f29bc1; --on-accent: #2b0f1d; --logo: none; color-scheme: dark }
 }
-:root[data-theme="dark"] { --bg: #091a20; --panel: #0f262e; --fg: #e4f0f1; --muted: #9bb6bb; --rule: #23424b; --accent: #f29bc1; --on-accent: #2b0f1d; color-scheme: dark }
+:root[data-theme="dark"] { --bg: #091a20; --panel: #0f262e; --fg: #e4f0f1; --muted: #9bb6bb; --rule: #23424b; --accent: #f29bc1; --on-accent: #2b0f1d; --logo: none; color-scheme: dark }
 
 * { box-sizing: border-box }
 body {
@@ -38,7 +38,7 @@ body {
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem }
 .name { display: flex; align-items: center; gap: 0.5rem; margin: 0 auto 0 0; font: 700 1.6rem/1 var(--display); letter-spacing: 0.01em }
 .name canvas { width: 32px; height: 38px }
-.logo { flex: none; height: 2.75rem; width: auto; padding: 0.4rem 0.65rem; border-radius: 8px; background: var(--water); image-rendering: pixelated }      /* a white, pixelated logo: on the dark of the board in both themes */
+.logo { flex: none; height: 2.6rem; width: auto; filter: var(--logo) }      /* a white logo straight on the page: left white on the dark page, darkened to ink on the light one */
 .hud { display: flex; align-items: center; gap: 1rem; margin: 0 }
 .hud div { display: flex; flex-direction: column; gap: 0.1rem }
 .hud dt { font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted) }
@@ -84,6 +84,14 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px }
 .picks button[aria-checked="true"] { border-color: var(--accent); background: var(--accent); color: var(--on-accent) }
 .picks .swatch { width: 1.9rem; padding: 0; border: 3px solid var(--panel); box-shadow: 0 0 0 1px var(--rule) }
 .picks .swatch[aria-checked="true"] { border-color: var(--panel); box-shadow: 0 0 0 2px var(--fg) }
+.me { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.7rem }
+.me .after, .me .keys { margin: 0 }
+.me .keys { flex-basis: 100% }
+.me-list { display: flex; flex-wrap: wrap; gap: 0.2rem }
+.me-list button { display: flex; align-items: center; gap: 0.35rem; min-height: 2.25rem; padding: 0.15rem 0.6rem 0.15rem 0.2rem; border: 2px solid transparent; border-radius: 999px; background: var(--panel); color: var(--fg); font-size: 0.8rem; font-weight: 600 }
+.me-list button[aria-checked="true"] { border-color: var(--accent) }
+.me-list button:disabled { opacity: 0.45; cursor: default }
+.me-list canvas { display: block; width: 28px; height: 28px; border-radius: 50% }
 .who { margin-top: 0.8rem }
 .who p { margin: 0 0 0.35rem; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase }
 .who-list { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.25rem }
@@ -121,6 +129,12 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     <button id="pause" class="pause" type="button" hidden>Pause</button>
     <label class="duo"><input type="checkbox" id="music" checked><span>Music</span></label>
   </header>
+
+  <div id="me" class="me" hidden>
+    <p id="me-title" class="after">You are</p>
+    <div id="me-list" class="me-list" role="radiogroup" aria-labelledby="me-title"></div>
+    <p id="live" class="keys" aria-live="polite"></p>
+  </div>
 
   <section class="board" aria-label="The cove">
     <canvas id="cove" class="pix" width="342" height="378" role="img" aria-label="The cove"></canvas>
@@ -492,7 +506,13 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     if (who < 0) face(faces.runner, s, time, s.moving && !still ? 0.5 - 0.5 * Math.cos(time / 35) : 0);
     else face((fading ? faces.pale[who] : faces.theirs[who])[still ? 0 : Math.floor(time / 110) % HEM.length], s, time);
   }
-  function paint(g, time) {
+  /** What is drawn: the same whether the game runs here or is received from the screen it runs on (playing together). */
+  const sceneOf = (g, time) => ({
+    cells: g.cells, hidden: g.phase === "caught" && Math.floor(time / 150) % 2 === 0,
+    runner: { ...at(g.player), dir: g.player.dir, moving: g.phase === "play" && g.player.dir !== -1 },
+    chasers: g.chasers.map((c) => ({ ...at(c), dir: c.dir, moving: c.out && c.dir !== -1, pale: c.scared && (g.scared > 2000 || Math.floor(time / 200) % 2 === 1) })),      // it flickers back before the chase turns again
+  });
+  function paint(scene, time) {
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(maze, 0, 0);
     if (faces) {                                                     // the portraits' canvas keeps to the size of the cove on the screen
@@ -500,23 +520,20 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
       if (layer.width !== w) { layer.width = w; layer.height = Math.round((w * H) / W); }
       lctx.clearRect(0, 0, layer.width, layer.height);
     }
-    if (!g) {                                                        // before a game: everybody at their place
+    if (!scene) {                                                    // before a game: everybody at their place
       figure(-1, { ...START, dir: -1, moving: false }, 0, false);
       SLOTS.forEach((_, i) => figure(i, { x: 7 + i + (i > 1 ? 1 : 0), y: 7, dir: -1, moving: false }, 0, false));
       return;
     }
     const big = still ? 0 : Math.floor(time / 300) % 2;
-    for (let i = 0; i < g.cells.length; i += 1) {
-      const v = g.cells[i], x = (i % COLS) * T + T / 2, y = Math.floor(i / COLS) * T + T / 2;
+    for (let i = 0; i < scene.cells.length; i += 1) {
+      const v = Number(scene.cells[i]), x = (i % COLS) * T + T / 2, y = Math.floor(i / COLS) * T + T / 2;
       if (v === 1 && EYELETS) { ctx.fillStyle = "#f6f2e6"; ctx.fillRect(x - 1, y - 2, 2, 1); ctx.fillRect(x - 1, y + 1, 2, 1); ctx.fillRect(x - 2, y - 1, 1, 2); ctx.fillRect(x + 1, y - 1, 1, 2); }      // an eyelet: a small ring
       else if (v === 1) { ctx.fillStyle = WHITE; ctx.fillRect(x - 1, y - 1, 2, 2); }
       else if (v === 2) { ctx.fillStyle = "#f4a340"; ctx.fillRect(x - 3 - big, y - 1, 6 + 2 * big, 2); ctx.fillRect(x - 1, y - 3 - big, 2, 6 + 2 * big); ctx.fillStyle = "#d9822b"; ctx.fillRect(x - 1, y - 1, 2, 2); }
     }
-    g.chasers.forEach((c, i) => {
-      const fading = c.scared && (g.scared > 2000 || Math.floor(time / 200) % 2 === 1);       // it flickers back before the chase turns again
-      figure(i, { ...at(c), dir: c.dir, moving: c.out && c.dir !== -1 }, time, fading);
-    });
-    if (!(g.phase === "caught" && Math.floor(time / 150) % 2 === 0)) figure(-1, { ...at(g.player), dir: g.player.dir, moving: g.phase === "play" && g.player.dir !== -1 }, time, false);
+    scene.chasers.forEach((c, i) => figure(i, c, time, c.pale));
+    if (!scene.hidden) figure(-1, scene.runner, time, false);
   }
 
   // ── The page around it. ────────────────────────────────────────────────────────────────────────────────────
@@ -633,13 +650,13 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
    */
   function tune() {
     if (!audio) return;
-    const phase = game ? game.phase : "", now = audio.currentTime;
+    const g = seen(), phase = g ? g.phase : "", now = audio.currentTime;
     if (phase !== heard) {                                           // a turn of the game: its short piece, and the tune starts afresh after it
       if (music && stage !== "intro" && phase === "caught") { jingle(FAIL, "sawtooth", 0.1); beat = 0; }
       if (music && stage !== "intro" && phase === "clear") { jingle(CHEER, "square", 0.12); beat = 0; }
       heard = phase;
     }
-    const on = music && stage === "play" && !paused && !document.hidden && (phase === "play" || phase === "ready");
+    const on = music && (stage === "play" || stage === "watch") && !paused && !document.hidden && (phase === "play" || phase === "ready");
     if (on !== sounding) { sounding = on; out.gain.setTargetAtTime(on ? 0.5 : 0, now, 0.03); }
     if (!on) return;
     if (due < now) due = now + 0.05;                                 // after a silence the tune carries on from where it stopped
@@ -654,8 +671,112 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
   $("music").checked = music;
   setInterval(tune, 100);
 
+  // ── Playing together (Dimitris, 25 Nov 2026: "the game shall be multiplayer"). Only where the page is served with a
+  // live line: a meta tag names it, and the game's own small server gives the page out with one (light-managers/server).
+  // Everybody who has the page open is at one table. Each says which of the people they are, and steers that face.
+  // The one who is chased starts the game and it runs on THEIR screen; the others receive its picture some fifteen
+  // times a second and send back which way they steer. A chaser whose person is not there is steered by the computer,
+  // as in a game alone. Alone at the table, the game is the game for one.
+  const LIVE = document.querySelector('meta[name="game-live"]')?.content || "", ME = `${GAME.id}:me`;
+  const peers = new Map();                                           // the others who are here, by their line: { seat }
+  let net = null, seat = -1, hostOf = null, told = 0, wire = null;   // wire: the last picture received, and where each figure is shown
+  // `guest`: a game that runs on somebody else's screen, as much of it as the bar and the tune read.
+  let guest = null;
+  const seen = () => game || guest;
+  try { seat = Number(localStorage.getItem(ME) ?? -1); } catch { /* a private window: nobody yet */ }
+  if (!GAME.people[seat]) seat = -1;
+  const here = (n) => [...peers.values()].some((one) => one.seat === n);      // somebody else is here as person n
+  /** What the page says about the table: who is here, and who may start. */
+  function table() {
+    if (!LIVE || GAME.people.length < 2) return;
+    const names = [...peers.values()].filter((one) => GAME.people[one.seat]).map((one) => GAME.people[one.seat].name).join(", ");
+    const mine = seat === runner;
+    $("me").hidden = false; $("duo").closest("label").hidden = true;       // two at one keyboard gives way to each at their own screen
+    [...$("me-list").children].forEach((b, n) => { b.setAttribute("aria-checked", String(n === seat)); b.disabled = here(n); });
+    $("play").hidden = peers.size > 0 && !mine;
+    $("live").textContent = !net ? "Not connected: you can play alone. Trying again."
+      : peers.size === 0 ? "Nobody else is here yet. Play alone, or tell the others to open this page."
+      : seat < 0 ? `Here now: ${names || "somebody who has not said who they are"}. Say who you are to join in.`
+      : stage === "watch" ? `Here now: ${names}. ${person.name} is being chased.`
+      : mine ? `Here now: ${names || "somebody who has not said who they are"}. You are the one chased: start when they are ready.`
+      : here(runner) ? `Here now: ${names}. Waiting for ${person.name} to start.`
+      : `${person.name} is not here. Choose somebody who is here to be chased.`;
+  }
+  /** Say which of the people you are. */
+  function sit(n) {
+    seat = n;
+    try { localStorage.setItem(ME, String(n)); } catch { /* as above */ }
+    net?.send({ t: "p", p: { seat } });
+    table();
+  }
+  /** The game that runs here, for the others: its picture, small. */
+  function tell() {
+    const g = game, m = (o) => [o.x, o.y, o.dir, Math.round(o.p * 100) / 100];
+    net.send({ t: "e", topic: "s", d: { st: stage, lv: g.level, sc: g.score, li: g.lives, ph: g.phase, sd: Math.round(g.scared), by: g.by, pl: m(g.player), ch: g.chasers.map((c) => [...m(c), c.out ? 1 : 0, c.scared ? 1 : 0]), c: Array.from(g.cells).join("") } });
+  }
+  /** A picture of somebody else's game has come. What comes over the line is never trusted: it is checked, then drawn. */
+  function watch(id, d) {
+    if (!d || typeof d.c !== "string" || d.c.length !== COLS * ROWS || !Array.isArray(d.pl) || !Array.isArray(d.ch) || d.ch.length !== 4) return;
+    hostOf = id; game = null;
+    wire = { d, shown: wire?.shown ?? [] };
+    guest = { score: Number(d.sc) || 0, level: Number(d.lv) || 1, lives: Number(d.li) || 0, phase: String(d.ph), by: [0, 1, 2, 3].includes(d.by) ? d.by : 0, humans: [false] };
+    if (d.st === "over") {                                           // their game is over
+      if (stage !== "watch") return;
+      stage = "over";
+      $("veil-title").textContent = "Caught!";
+      $("veil-text").textContent = `${cast[guest.by].name} got ${person.name}. ${points(guest.score)} points, level ${guest.level}.`;
+      $("veil-best").hidden = true; $("play").textContent = "Play";
+      $("veil").hidden = false;
+    } else if (stage !== "watch") { stage = "watch"; paused = false; $("veil").hidden = true; }
+  }
+  /** The received game as a scene: each figure glides from where it is shown to where the last picture says it is. */
+  function watching(now) {
+    const d = wire.d, a = Math.min(1, (now - last) / 60);
+    const spot = (m, moving) => ({ x: m[0] + (m[2] < 0 ? 0 : DX[m[2]] * m[3]), y: m[1] + (m[2] < 0 ? 0 : DY[m[2]] * m[3]), dir: m[2], moving });
+    const to = [spot(d.pl, d.ph === "play" && d.pl[2] >= 0), ...d.ch.map((c) => spot(c, c[4] === 1 && c[2] >= 0))];
+    wire.shown = to.map((t, i) => { const f = wire.shown[i]; return !f || Math.abs(t.x - f.x) + Math.abs(t.y - f.y) > 3 ? t : { ...t, x: f.x + (t.x - f.x) * a, y: f.y + (t.y - f.y) * a }; });      // a jump (the tunnel, a lost life) is not glided
+    return { cells: d.c, hidden: d.ph === "caught" && Math.floor(now / 150) % 2 === 0, runner: wire.shown[0], chasers: wire.shown.slice(1).map((c, i) => ({ ...c, pale: d.ch[i][5] === 1 && (d.sd > 2000 || Math.floor(now / 200) % 2 === 1) })) };
+  }
+  /** What comes over the line. */
+  function hear(m) {
+    if (!m || typeof m !== "object") return;
+    const busy = stage === "play" || stage === "watch";
+    if (m.t === "hello") {
+      peers.clear();
+      for (const [id, p] of m.peers || []) peers.set(id, p || {});
+      if (m.shared?.looks && typeof m.shared.looks === "object") looks = m.shared.looks;
+      if (GAME.people[m.shared?.runner] && !busy) choose(m.shared.runner, true); else dress();
+    } else if (m.t === "p") peers.set(m.id, m.p || {});
+    else if (m.t === "bye") {
+      peers.delete(m.id);
+      if (m.id === hostOf && stage === "watch") { hostOf = null; choose(runner, true); }      // the one whose game it was has gone
+    } else if (m.t === "set" && m.k === "runner" && GAME.people[m.v] && !busy) choose(m.v, true);
+    else if (m.t === "set" && m.k === "looks" && m.v && typeof m.v === "object") { looks = m.v; dress(); }
+    else if (m.t === "e" && m.topic === "s" && stage !== "play") watch(m.id, m.d);
+    else if (m.t === "e" && m.topic === "w" && stage === "play") {   // somebody steers their own face in the game that runs here
+      const n = cast.findIndex((c) => c.key === `p${peers.get(m.id)?.seat}`);
+      if (n >= 0 && [0, 1, 2, 3].includes(m.d)) game.wants[n] = m.d;
+    }
+    table();
+  }
+  function connect() {
+    const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}${LIVE}`);
+    ws.onopen = () => { net = { send: (m) => { if (ws.readyState === 1) ws.send(JSON.stringify(m)); } }; net.send({ t: "p", p: { seat } }); table(); };
+    ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch { return; } hear(m); };
+    ws.onclose = () => {                                             // the line is down: alone again, and trying again
+      net = null; peers.clear();
+      if (stage === "watch") { hostOf = null; choose(runner, true); }
+      table(); setTimeout(connect, 2500);
+    };
+  }
+  /** Steer: the game that runs here, or one's own face in the game one is in. */
+  function steer(d) {
+    if (stage === "watch") net?.send({ t: "e", topic: "w", d });
+    else if (stage === "play") game.want = d;
+  }
+
   function hud() {
-    const g = game, steered = stage === "play" ? g.humans[0] : $("duo").checked;      // a second player steers Dimitris
+    const g = seen(), busy = stage === "play" || stage === "watch", steered = !LIVE && (stage === "play" ? g.humans[0] : $("duo").checked);      // a second player at this keyboard
     const key = `${stage},${steered},` + (g ? `${paused},${g.score},${g.level},${g.lives},${g.phase}` : "");
     if (key === shown) return;
     shown = key;
@@ -666,16 +787,16 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     [...$("lives").children].forEach((c, i) => c.classList.toggle("gone", i >= lives));
     $("pause").hidden = stage !== "play";
     $("pause").textContent = paused ? "Resume" : "Pause";
-    const word = stage !== "play" ? "" : paused ? "Paused" : g.phase === "ready" ? "Ready?" : g.phase === "clear" ? `Level ${g.level} cleared!` : g.phase === "caught" ? `${cast[g.by].name} caught you!` : "";
+    const word = !busy ? "" : paused ? "Paused" : g.phase === "ready" ? "Ready?" : g.phase === "clear" ? `Level ${g.level} cleared!` : g.phase === "caught" ? `${cast[g.by].name} caught ${stage === "watch" ? person.name : "you"}!` : "";
     $("word").textContent = word; $("word").hidden = !word;
     const lead = $("cast").firstElementChild;
     lead.classList.toggle("steered", steered);
     lead.querySelector("span").lastChild.textContent = steered ? "steered by the second player" : SLOTS[0].does;
   }
   function start() {
-    game = newGame(); stage = "play"; paused = false;
+    game = newGame(); guest = null; stage = "play"; paused = false;
     wake();
-    game.humans[0] = $("duo").checked;
+    game.humans[0] = !LIVE && $("duo").checked;
     $("veil").hidden = true;
     $("cove").scrollIntoView?.({ block: "nearest" });
   }
@@ -690,14 +811,20 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     $("play").textContent = "Play again";
     $("veil").hidden = false;
     $("play").focus({ preventScroll: true });
+    if (net) { tell(); table(); }                                    // the others see how it ended
   }
   function frame(now) {
     const g = game;
-    if (g && stage === "play" && !paused && !document.hidden) {
-      step(g, Math.min(50, now - last));
-      if (g.phase === "over") over();
+    if (stage === "watch") paint(watching(now), now);
+    else {
+      if (g && stage === "play" && !paused && !document.hidden) {
+        if (net) cast.forEach((c, n) => { g.humans[n] = here(Number(c.key.slice(1))); });      // whoever is here steers their own face
+        step(g, Math.min(50, now - last));
+        if (g.phase === "over") over();
+      }
+      paint(stage === "intro" || !g ? null : sceneOf(g, now), now);
+      if (net && g && stage === "play" && now - told >= 66) { told = now; tell(); }
     }
-    paint(stage === "intro" ? null : g, now);
     hud();
     last = now;
     requestAnimationFrame(frame);
@@ -708,21 +835,21 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
   const WASD = { KeyW: 0, KeyD: 1, KeyS: 2, KeyA: 3 };               // by place on the keyboard, so a Greek layout works too
   const pause = () => { if (stage === "play") { paused = !paused; wake(); } };
   window.addEventListener("keydown", (e) => {
-    if (stage !== "play" || e.metaKey || e.ctrlKey || e.altKey) return;
+    if ((stage !== "play" && stage !== "watch") || e.metaKey || e.ctrlKey || e.altKey) return;
     if (e.code === "Space" || e.code === "KeyP") { e.preventDefault(); if (!e.repeat) pause(); return; }
     const d = ARROWS[e.key] ?? WASD[e.code];
     if (d === undefined) return;
     e.preventDefault();
-    if (game.humans[0] && e.code in WASD) game.wants[0] = d;         // two players: W A S D is Dimitris's
-    else game.want = d;
+    if (stage === "play" && !LIVE && game.humans[0] && e.code in WASD) game.wants[0] = d;      // two at one keyboard: W A S D is the first chaser's
+    else steer(d);
   });
   let from = null;
   cove.addEventListener("pointerdown", (e) => { from = { x: e.clientX, y: e.clientY }; });
   cove.addEventListener("pointermove", (e) => {
-    if (!from || stage !== "play") return;
+    if (!from || (stage !== "play" && stage !== "watch")) return;
     const dx = e.clientX - from.x, dy = e.clientY - from.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 14) return;
-    game.want = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0;
+    steer(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : dy > 0 ? 2 : 0);
     from = { x: e.clientX, y: e.clientY };
   });
   for (const type of ["pointerup", "pointercancel"]) cove.addEventListener(type, () => { from = null; });
@@ -798,7 +925,7 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
           const b = document.createElement("button");
           b.type = "button"; b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(value === chosen));
           if (colour) { b.className = "swatch"; b.style.background = colour; b.title = text; b.setAttribute("aria-label", text); } else b.textContent = text;
-          b.addEventListener("click", () => { set(value); try { localStorage.setItem(LOOKS, JSON.stringify(looks)); } catch { /* as above */ } dress(); });
+          b.addEventListener("click", () => { set(value); try { localStorage.setItem(LOOKS, JSON.stringify(looks)); } catch { /* as above */ } dress(); net?.send({ t: "set", k: "looks", v: looks }); });
           group.append(b);
         }
         return group;
@@ -812,12 +939,14 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     if (held >= 0) list.querySelectorAll("button")[held]?.focus({ preventScroll: true });
   }
   /** Make people[i] the one who is chased; the others (or the game's one chaser, four times over) give chase. */
-  function choose(i) {
+  function choose(i, heard = false) {
     runner = i; person = GAME.people[i];
-    game = null; stage = "intro"; $("veil").hidden = false;         // back to the start screen, with everybody at their places
+    game = null; guest = null; wire = null; stage = "intro"; $("veil").hidden = false;      // back to the start screen, with everybody at their places
     dress();
     intro();
     [...$("who-list").children].forEach((b, n) => b.setAttribute("aria-checked", String(n === i)));
+    if (!heard) net?.send({ t: "set", k: "runner", v: i });          // playing together: the others' screens follow
+    table();
   }
   /** The row of faces to choose from; hidden when there is only one. */
   function picker() {
@@ -834,6 +963,13 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
       b.append(one.name);
       b.addEventListener("click", () => { choose(i); try { localStorage.setItem(RUNNER, String(i)); } catch { /* as above */ } });
       $("who-list").append(b);
+      if (!LIVE) return;                                             // playing together: the same faces again, to say who you are
+      const mine = document.createElement("button");
+      mine.type = "button"; mine.setAttribute("role", "radio");
+      if (pictures) { const small = document.createElement("canvas"); small.width = small.height = 80; small.getContext("2d").drawImage(b.firstChild, 0, 0); mine.append(small); }
+      mine.append(one.name);
+      mine.addEventListener("click", () => sit(i));
+      $("me-list").append(mine);
     });
   }
   Promise.all([...GAME.people.map((one) => photo(one.photo)), photo(GAME.chaser?.photo)]).then((imgs) => {
@@ -845,7 +981,8 @@ kbd { font: 600 0.78rem var(--body); padding: 0.05rem 0.35rem; border: 1px solid
     $("look").hidden = !pictures || !GAME.kymas;                     // without pictures there is nothing to choose
     $("kymas").checked = kymas;
     picker();
-    choose(GAME.people[first] ? first : 0);
+    choose(GAME.people[first] ? first : 0, true);
+    if (LIVE && GAME.people.length > 1) connect();
     if (hot?.ready) hot.ready(boot); else boot(hot?.data);
   });
 })();
